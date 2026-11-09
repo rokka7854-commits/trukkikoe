@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const C=require('./src/core.js');
+const state=C.fresh(),e=C.createExam(state);e.checks.forEach(c=>c.value='pass');e.removed=e.stored=5;
+assert.equal(e.limitMs,1500000);assert.equal(e.target,5);
+C.addCustomEvent(e,'Oma havainto','15');assert.equal(C.total(e),15);assert.equal(C.evaluate(e).status,'pass');
+for(const bad of ['',-1,1.5,'abc',1001])assert.throws(()=>C.addCustomEvent(e,'Havainto',bad));assert.throws(()=>C.addCustomEvent(e,'  ',15));
+C.addEvent(e,{key:'rack-0-0',label:'Pystypylväs – lievä kosketus',points:25,group:'Hyllyosumat'});assert.equal(C.total(e),40);
+C.addEvent(e,{key:'rack-0-1',label:'Pystypylväs – mahdollinen vaurio',points:50,group:'Hyllyosumat'});assert.equal(C.total(e),90);assert.equal(C.evaluate(e).status,'pass');
+C.addCustomEvent(e,'Lisähavainto',10);assert.equal(C.evaluate(e).status,'fail');e.events.pop();assert.equal(C.evaluate(e).status,'pass');
+C.addEvent(e,{key:'drop',label:'Lavan pudottaminen hyllystä',points:'fail',group:'Kuorma'});assert.equal(C.evaluate(e).status,'fail');e.events.pop();
+e.clock.runningSince=1000;C.pause(e,6000);assert.equal(C.elapsed(e,999999),5000);
+C.end(e,999999);e.phase='done';e.result=C.evaluate(e);e.confirmedAt=Date.now();assert.throws(()=>C.addCustomEvent(e,'Lukittu',10));state.exams=[e];state.activeId=e.id;
+const restored=C.validate(JSON.parse(JSON.stringify(state)));assert.equal(C.total(restored.exams[0]),90);assert.equal(restored.exams[0].events[0].group,'Muut virheet');
+const second=C.createExam(state);second.rules.limit=50;assert.equal(e.rules.limit,100);C.end(second,Date.now(),true);assert.equal(C.evaluate(second).status,'fail');
+for(const filename of ['src/app.js','src/pwa.js','src/pdf.js','sw.js'])new vm.Script(fs.readFileSync(filename,'utf8'));
+const manifest=JSON.parse(fs.readFileSync('manifest.webmanifest','utf8'));for(const icon of manifest.icons)assert.ok(fs.existsSync(icon.src));
+console.log('PASS: oma pisteytys, syötteiden validointi, 25/50 pistettä, hylkäysraja, suora hylkäys, tauko, ajan päättyminen, lukitus ja varmuuskopio.');
